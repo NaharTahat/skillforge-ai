@@ -1,0 +1,88 @@
+# Continuous integration. Validates every pull request and every push to main.
+# It never deploys: Railway deploys main only after these checks pass
+# ("Wait for CI" in the Railway service settings), and production database
+# migrations are applied manually after `npm run preflight` (see DEPLOYMENT.md).
+name: CI
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  # Test-only values. Nothing here is a real secret.
+  DATABASE_URL: postgresql://skillforge:skillforge@localhost:5432/skillforge_ci?schema=public
+  NEXT_PUBLIC_APP_URL: http://localhost:3000
+  AUTH_TRUST_HOST: "true"
+  AI_PROVIDER: mock
+  NEXT_TELEMETRY_DISABLED: "1"
+
+jobs:
+  verify:
+    name: Static checks, unit tests, audit, build
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: npm
+      - run: npm ci
+      - name: Generate a throwaway AUTH_SECRET
+        run: echo "AUTH_SECRET=$(openssl rand -base64 32)" >> "$GITHUB_ENV"
+      - run: npx prisma validate
+      - run: npm run typecheck
+      - run: npm run lint
+      - run: npm run prettier:check
+      - run: npm test
+      - name: Dependency audit (runtime, with reviewed allowlist)
+        run: npm run audit:prod
+      - run: npm run build
+
+  e2e:
+    name: End-to-end (PostgreSQL)
+    needs: verify
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    services:
+      postgres:
+        image: postgres:17
+        env:
+          POSTGRES_USER: skillforge
+          POSTGRES_PASSWORD: skillforge
+          POSTGRES_DB: skillforge_ci
+        ports: ["5432:5432"]
+        options: >-
+          --health-cmd "pg_isready -U skillforge -d skillforge_ci"
+          --health-interval 5s --health-timeout 5s --health-retries 20
+    env:
+      E2E_BROWSER_CHANNEL: chrome
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: npm
+      - run: npm ci
+      - name: Generate a throwaway AUTH_SECRET
+        run: echo "AUTH_SECRET=$(openssl rand -base64 32)" >> "$GITHUB_ENV"
+      - name: Apply migrations to the CI database
+        run: npx prisma migrate deploy
+      - run: npm run build
+      - run: npx playwright install --with-deps chrome
+      - run: npm run test:e2e
+      - name: Upload Playwright traces on failure
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: playwright-results
+          path: test-results/
+          retention-days: 7

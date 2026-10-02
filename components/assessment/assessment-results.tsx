@@ -1,0 +1,417 @@
+import Link from "next/link";
+import { CircleCheck, CircleDashed, CircleX, Info, Lightbulb, ListChecks } from "lucide-react";
+import { ReadinessRing } from "@/components/shared/readiness-ring";
+import { Badge } from "@/components/ui/badge";
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import type { MyAssessmentResult } from "@/lib/data/assessment";
+import {
+  LEVEL_LABELS,
+  PERFORMANCE_LABELS,
+  QUESTION_SOURCE_LABELS,
+  QUESTION_TYPE_LABELS,
+  isObjective,
+  type PerformanceLevel,
+} from "@/lib/assessment/constants";
+import { cn } from "@/lib/utils";
+
+const LEVEL_TONE: Record<PerformanceLevel, string> = {
+  STRONG: "text-success",
+  COMPETENT: "text-brand",
+  DEVELOPING: "text-warning",
+  NEEDS_IMPROVEMENT: "text-destructive",
+};
+
+function Bar({ label, percentage, detail }: { label: string; percentage: number; detail: string }) {
+  return (
+    <li>
+      <div className="flex flex-wrap items-baseline justify-between gap-x-3 text-sm">
+        <span className="min-w-0 font-medium break-words">{label}</span>
+        <span className="text-muted-foreground tabular-nums">
+          <span className="font-medium text-foreground">{percentage}%</span> · {detail}
+        </span>
+      </div>
+      <div
+        className="mt-1.5 h-1.5 overflow-hidden rounded-full bg-muted"
+        role="img"
+        aria-label={`${label}: ${percentage}%`}
+      >
+        <div className="h-full rounded-full bg-brand" style={{ width: `${percentage}%` }} />
+      </div>
+    </li>
+  );
+}
+
+function InsightList({
+  title,
+  items,
+  icon: Icon,
+  tone,
+  empty,
+}: {
+  title: string;
+  items: { skill: string | null; text: string }[];
+  icon: typeof CircleCheck;
+  tone: string;
+  empty: string;
+}) {
+  return (
+    <Card>
+      <CardHeader>
+        <CardTitle role="heading" aria-level={2}>
+          {title}
+        </CardTitle>
+      </CardHeader>
+      <CardContent>
+        {items.length === 0 ? (
+          <p className="text-sm text-muted-foreground">{empty}</p>
+        ) : (
+          <ul className="grid gap-2 text-sm">
+            {items.map((i) => (
+              <li key={i.text} className="flex gap-2">
+                <Icon className={cn("mt-0.5 size-4 shrink-0", tone)} aria-hidden />
+                <span className="min-w-0 break-words">{i.text}</span>
+              </li>
+            ))}
+          </ul>
+        )}
+      </CardContent>
+    </Card>
+  );
+}
+
+export function AssessmentResults({ data }: { data: MyAssessmentResult }) {
+  const { score, skills, categories, insights, assessment } = data;
+  return (
+    <div className="grid grid-cols-1 gap-6">
+      <Card>
+        <CardHeader>
+          <CardTitle role="heading" aria-level={2}>
+            Overall score
+          </CardTitle>
+          <CardDescription>
+            Calculated by SkillForge from your answers — the AI never sets the score.
+          </CardDescription>
+        </CardHeader>
+        <CardContent className="grid gap-8 md:grid-cols-[200px_minmax(0,1fr)] md:items-start">
+          <div className="flex flex-col items-center gap-2 text-center">
+            <ReadinessRing value={score.percentage} size={148} label="Overall assessment score" />
+            <p className="text-2xl font-semibold tabular-nums" data-testid="overall-percentage">
+              {score.percentage}%
+            </p>
+            <p
+              className={cn("text-sm font-medium", LEVEL_TONE[score.level])}
+              data-testid="overall-level"
+            >
+              {PERFORMANCE_LABELS[score.level]}
+            </p>
+            <p className="text-xs text-muted-foreground tabular-nums" data-testid="raw-score">
+              {score.rawScore} / {score.maxScore} points
+            </p>
+          </div>
+          <div className="min-w-0">
+            <h3 className="text-sm font-medium">Category scores</h3>
+            <ul className="mt-3 grid gap-4">
+              {categories.map((c) => (
+                <Bar
+                  key={c.category}
+                  label={c.label}
+                  percentage={c.percentage}
+                  detail={`${c.questions} question${c.questions === 1 ? "" : "s"}`}
+                />
+              ))}
+            </ul>
+            {score.timeExpired && (
+              <p className="mt-4 flex items-start gap-2 rounded-lg border border-warning/40 bg-warning/5 px-3 py-2 text-xs">
+                <Info className="mt-0.5 size-3.5 shrink-0 text-warning" aria-hidden />
+                Time limit reached — scored on the answers saved in time. Unanswered questions score
+                0.
+              </p>
+            )}
+            {assessment.provider === "mock" && (
+              <p className="mt-3 flex items-start gap-2 rounded-lg border border-warning/40 bg-warning/5 px-3 py-2 text-xs">
+                <Info className="mt-0.5 size-3.5 shrink-0 text-warning" aria-hidden />
+                Generated by the deterministic mock provider for development. It is not an AI
+                assessment.
+              </p>
+            )}
+            <details className="mt-4 rounded-lg border bg-muted/30 px-4 py-3 text-xs text-muted-foreground">
+              <summary className="cursor-pointer font-medium text-foreground">
+                How scores are calculated
+              </summary>
+              <p className="mt-2">
+                Every question is worth 1 point. Multiple-choice and true/false answers are graded
+                on the server (1 or 0). Open answers are rated 0–10 on accuracy, completeness,
+                relevance, technical depth and clarity, then weighted 35/20/20/15/10. Unanswered
+                questions score 0. Levels: 85%+ Strong · 70%+ Competent · 50%+ Developing · below
+                50% Needs improvement.
+              </p>
+            </details>
+          </div>
+        </CardContent>
+      </Card>
+
+      <Card>
+        <CardHeader>
+          <CardTitle role="heading" aria-level={2}>
+            Skill breakdown
+          </CardTitle>
+        </CardHeader>
+        <CardContent>
+          <ul className="grid gap-4" data-testid="skill-breakdown">
+            {skills.map((s) => (
+              <Bar
+                key={s.skill}
+                label={s.skill}
+                percentage={s.percentage}
+                detail={`${PERFORMANCE_LABELS[s.level]} · ${s.questions} question${s.questions === 1 ? "" : "s"}`}
+              />
+            ))}
+          </ul>
+        </CardContent>
+      </Card>
+
+      {data.jobAlignment && (
+        <Card>
+          <CardHeader>
+            <CardTitle role="heading" aria-level={2}>
+              Job Match Alignment
+            </CardTitle>
+            <CardDescription>
+              {assessment.job?.title ?? "This job"}: the job-relevant skills tested here. This
+              measures your answers to these questions — it doesn&apos;t prove job readiness or
+              guarantee an outcome.
+            </CardDescription>
+          </CardHeader>
+          <CardContent>
+            <ul className="grid gap-3 text-sm">
+              {data.jobAlignment.map((row) => {
+                const s = skills.find((x) => x.skill === row.skill);
+                return (
+                  <li key={row.skill} className="min-w-0 rounded-lg border p-3">
+                    <div className="flex flex-wrap items-baseline justify-between gap-2">
+                      <span className="font-medium">{row.skill}</span>
+                      <span className="tabular-nums">{s ? `${s.percentage}%` : "Not tested"}</span>
+                    </div>
+                    <p className="mt-1 text-xs text-muted-foreground">
+                      From the job:{" "}
+                      {row.requirements
+                        .map(
+                          (r) =>
+                            `${r.term} (${r.kind === "REQUIRED" ? "required" : "preferred"}; ${r.match === "PRESENT" ? "shown in your CV" : r.match === "PARTIAL" ? "partially shown" : "not shown in your CV"})`,
+                        )
+                        .join(" · ") || "—"}
+                    </p>
+                  </li>
+                );
+              })}
+            </ul>
+          </CardContent>
+        </Card>
+      )}
+
+      <div className="grid grid-cols-1 gap-6 lg:grid-cols-2">
+        <InsightList
+          title="Strengths"
+          items={insights.strengths}
+          icon={CircleCheck}
+          tone="text-success"
+          empty="No clear strengths in this attempt yet."
+        />
+        <InsightList
+          title="Improvement areas"
+          items={insights.improvementAreas}
+          icon={CircleDashed}
+          tone="text-warning"
+          empty="No specific gaps were found in this attempt."
+        />
+      </div>
+
+      <Card>
+        <CardHeader>
+          <CardTitle role="heading" aria-level={2}>
+            Recommendations
+          </CardTitle>
+          <CardDescription>Roadmap tasks are linked, never changed.</CardDescription>
+        </CardHeader>
+        <CardContent className="grid gap-5">
+          {insights.recommendations.length === 0 ? (
+            <p className="text-sm text-muted-foreground">
+              Keep practicing at a higher difficulty to stretch further.
+            </p>
+          ) : (
+            <ul className="grid gap-2 text-sm" data-testid="recommendations">
+              {insights.recommendations.map((r) => (
+                <li key={r.text} className="flex gap-2">
+                  <Lightbulb className="mt-0.5 size-4 shrink-0 text-brand" aria-hidden />
+                  <span className="min-w-0 break-words">{r.text}</span>
+                </li>
+              ))}
+            </ul>
+          )}
+          {insights.reviewTopics.length > 0 && (
+            <div>
+              <h3 className="text-sm font-medium">Review topics</h3>
+              <ul className="mt-2 grid gap-1.5 text-sm">
+                {insights.reviewTopics.map((t) => (
+                  <li key={`${t.skill}-${t.topic}`} className="flex gap-2">
+                    <ListChecks
+                      className="mt-0.5 size-4 shrink-0 text-muted-foreground"
+                      aria-hidden
+                    />
+                    <span className="min-w-0 break-words">
+                      <span className="font-medium">{t.skill}:</span> {t.topic}
+                    </span>
+                  </li>
+                ))}
+              </ul>
+            </div>
+          )}
+          <Link
+            href="/dashboard/roadmap"
+            className="inline-block w-fit rounded-sm py-1.5 text-xs text-brand hover:underline"
+          >
+            Open Career Roadmap
+          </Link>
+        </CardContent>
+      </Card>
+
+      {data.interview && (
+        <Card>
+          <CardHeader>
+            <CardTitle role="heading" aria-level={2}>
+              Other measurements
+            </CardTitle>
+            <CardDescription>
+              Separate measurements — they are not combined into one score.
+            </CardDescription>
+          </CardHeader>
+          <CardContent>
+            <dl className="grid grid-cols-1 gap-3 text-sm sm:grid-cols-2">
+              <div className="rounded-lg border p-3">
+                <dt className="text-xs text-muted-foreground">This assessment</dt>
+                <dd className="mt-0.5 text-lg font-semibold tabular-nums">{score.percentage}%</dd>
+              </div>
+              <div className="rounded-lg border p-3">
+                <dt className="text-xs text-muted-foreground">
+                  Latest AI Interview{data.interview.target ? ` · ${data.interview.target}` : ""}
+                </dt>
+                <dd className="mt-0.5 text-lg font-semibold tabular-nums">
+                  <Link
+                    href={`/dashboard/interview/${data.interview.id}`}
+                    className="rounded-sm hover:underline"
+                  >
+                    {data.interview.overallScore}/100
+                  </Link>
+                </dd>
+              </div>
+            </dl>
+          </CardContent>
+        </Card>
+      )}
+
+      <section aria-labelledby="review-heading" className="min-w-0">
+        <h2 id="review-heading" className="mb-3 text-lg font-semibold tracking-tight">
+          Answer review
+        </h2>
+        <ol className="grid grid-cols-1 gap-3">
+          {data.questions.map((q) => {
+            const points = q.answer?.score ?? 0;
+            const Icon = !q.answer
+              ? CircleDashed
+              : points >= 0.99
+                ? CircleCheck
+                : points >= 0.5
+                  ? CircleDashed
+                  : CircleX;
+            const tone = !q.answer
+              ? "text-muted-foreground"
+              : points >= 0.99
+                ? "text-success"
+                : points >= 0.5
+                  ? "text-warning"
+                  : "text-destructive";
+            const correct =
+              q.type === "MULTIPLE_CHOICE"
+                ? q.options?.find((o) => o.id === q.correctAnswer)?.label
+                : q.type === "TRUE_FALSE"
+                  ? q.correctAnswer === "true"
+                    ? "True"
+                    : "False"
+                  : null;
+            const given =
+              q.answer &&
+              (q.type === "MULTIPLE_CHOICE"
+                ? (q.options?.find((o) => o.id === q.answer!.response)?.label ?? q.answer.response)
+                : q.type === "TRUE_FALSE"
+                  ? q.answer.response === "true"
+                    ? "True"
+                    : "False"
+                  : q.answer.response);
+            return (
+              <li key={q.id} className="min-w-0">
+                <details
+                  className="rounded-xl border bg-card px-4 py-3"
+                  data-testid="answer-review-item"
+                >
+                  <summary className="cursor-pointer text-sm">
+                    <Icon className={cn("mr-1.5 inline size-4 align-[-3px]", tone)} aria-hidden />
+                    <span className="font-medium">Question {q.position}</span>
+                    <span className="text-muted-foreground">
+                      {" "}
+                      · {q.skill} ·{" "}
+                      {q.answer ? `${Math.round(points * 100) / 100} / 1 point` : "Not answered"}
+                    </span>
+                  </summary>
+                  <div className="mt-3 grid gap-3 text-sm">
+                    <div className="flex flex-wrap gap-1.5">
+                      <Badge variant="outline" className="font-normal">
+                        {QUESTION_TYPE_LABELS[q.type]}
+                      </Badge>
+                      <Badge variant="outline" className="font-normal">
+                        {LEVEL_LABELS[q.difficulty]}
+                      </Badge>
+                    </div>
+                    {q.scenario && (
+                      <p className="rounded-lg bg-muted/40 px-3 py-2 whitespace-pre-wrap">
+                        {q.scenario}
+                      </p>
+                    )}
+                    <p className="font-medium break-words whitespace-pre-wrap">{q.prompt}</p>
+                    <p className="text-xs text-muted-foreground">
+                      Source: {QUESTION_SOURCE_LABELS[q.source]} — {q.sourceReason}
+                    </p>
+                    <div>
+                      <h3 className="text-xs text-muted-foreground">Your answer</h3>
+                      <p className="mt-0.5 break-words whitespace-pre-wrap">
+                        {given ?? "Not answered"}
+                      </p>
+                    </div>
+                    {isObjective(q.type) ? (
+                      <div>
+                        <h3 className="text-xs text-muted-foreground">Correct answer</h3>
+                        <p className="mt-0.5">{correct}</p>
+                      </div>
+                    ) : (
+                      <div>
+                        <h3 className="text-xs text-muted-foreground">A complete answer covers</h3>
+                        <ul className="mt-0.5 list-disc pl-5">
+                          {q.expectedPoints.map((p) => (
+                            <li key={p}>{p}</li>
+                          ))}
+                        </ul>
+                      </div>
+                    )}
+                    {q.answer?.feedback && (
+                      <p className="text-muted-foreground">{q.answer.feedback}</p>
+                    )}
+                    <p className="text-xs text-muted-foreground">{q.explanation}</p>
+                  </div>
+                </details>
+              </li>
+            );
+          })}
+        </ol>
+      </section>
+    </div>
+  );
+}

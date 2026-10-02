@@ -1,0 +1,1123 @@
+// SkillForge AI — database schema
+// Docs: https://pris.ly/d/prisma-schema
+
+generator client {
+  provider = "prisma-client"
+  output   = "../lib/generated/prisma"
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+// ─── Enums ───────────────────────────────────────────────────────────────────
+
+enum Role {
+  USER
+  ADMIN
+}
+
+/// Shared scale for skill proficiency, assessment results and roadmap difficulty.
+enum SkillLevel {
+  BEGINNER
+  INTERMEDIATE
+  ADVANCED
+  /// Phase 8: self-assessed level on a user's skill. Never assigned by AI.
+  EXPERT
+}
+
+/// Portfolio items are private until the user explicitly makes them public.
+enum Visibility {
+  PRIVATE
+  PUBLIC
+}
+
+enum ProjectStatus {
+  PLANNED
+  IN_PROGRESS
+  COMPLETED
+  ARCHIVED
+}
+
+/// Links the user attaches to a project. User-provided — never shown as "verified".
+enum ProjectEvidenceKind {
+  REPOSITORY
+  LIVE_DEMO
+  DOCUMENTATION
+  CERTIFICATE
+  SCREENSHOT
+  PUBLICATION
+  OTHER
+}
+
+enum AchievementKind {
+  COMPETITION
+  HACKATHON
+  AWARD
+  PUBLICATION
+  EVENT
+  RECOGNITION
+  OTHER
+}
+
+enum EmploymentType {
+  FULL_TIME
+  PART_TIME
+  INTERNSHIP
+  CONTRACT
+  FREELANCE
+  VOLUNTEER
+  OTHER
+}
+
+enum ExperienceLevel {
+  STUDENT
+  FRESH_GRADUATE
+  JUNIOR
+  MID
+  SENIOR
+}
+
+enum CareerGoal {
+  AI_ENGINEER
+  ML_ENGINEER
+  DATA_SCIENTIST
+  DATA_ANALYST
+  SOFTWARE_ENGINEER
+  CYBERSECURITY_ANALYST
+  FRONTEND_DEVELOPER
+  BACKEND_DEVELOPER
+  FULL_STACK_DEVELOPER
+  OTHER
+}
+
+enum SkillCategory {
+  PROGRAMMING
+  DATA
+  AI_ML
+  CLOUD_DEVOPS
+  SECURITY
+  WEB
+  SOFT_SKILL
+  OTHER
+}
+
+enum SkillSource {
+  SELF_REPORTED
+  CV
+  ASSESSMENT
+}
+
+enum AnalysisStatus {
+  PENDING
+  PROCESSING
+  COMPLETED
+  FAILED
+}
+
+/// Real pipeline checkpoints (used for stage-based progress, never percentages).
+enum AnalysisStage {
+  QUEUED
+  ANALYZING
+  FINALIZING
+}
+
+/// LOCKED and AVAILABLE are system-managed from task prerequisites; users move
+/// tasks between AVAILABLE, IN_PROGRESS and COMPLETED.
+enum RoadmapItemStatus {
+  LOCKED
+  AVAILABLE
+  IN_PROGRESS
+  COMPLETED
+}
+
+enum RoadmapSource {
+  JOB_MATCH
+  CAREER_GOAL
+}
+
+enum RoadmapTaskCategory {
+  FUNDAMENTALS
+  TECHNICAL_SKILL
+  TOOL
+  PROJECT
+  PORTFOLIO
+  INTERVIEW_PREPARATION
+  CAREER_PREPARATION
+}
+
+enum RoadmapPriority {
+  CRITICAL
+  HIGH
+  MEDIUM
+  LOW
+}
+
+enum InterviewType {
+  TECHNICAL
+  BEHAVIORAL
+  MIXED
+  HR_GENERAL
+}
+
+/// DRAFT (queued) → GENERATING → IN_PROGRESS → COMPLETED; GENERATING → FAILED.
+enum InterviewStatus {
+  DRAFT
+  GENERATING
+  IN_PROGRESS
+  COMPLETED
+  FAILED
+}
+
+enum InterviewSource {
+  JOB_MATCH
+  CAREER_GOAL
+}
+
+enum InterviewDifficulty {
+  ENTRY
+  INTERMEDIATE
+  ADVANCED
+}
+
+enum InterviewFocus {
+  JOB_REQUIREMENTS
+  MISSING_SKILLS
+  TECHNICAL_DEPTH
+  BEHAVIORAL
+  PROJECTS
+  GENERAL
+}
+
+/// Real pipeline checkpoints shown while an interview is being generated.
+enum InterviewStage {
+  PREPARING
+  GENERATING
+  VALIDATING
+  FINALIZING
+}
+
+enum InterviewQuestionKind {
+  TECHNICAL
+  BEHAVIORAL
+  PROJECT
+  CV
+  JOB
+  GAP
+  HR
+}
+
+/// Where a question comes from. Every question must be traceable to one.
+enum InterviewQuestionSource {
+  CV
+  CV_ANALYSIS
+  JOB_DESCRIPTION
+  JOB_MATCH
+  CAREER_GOAL
+  ROADMAP
+  GENERAL
+}
+
+enum InterviewQuestionStatus {
+  PENDING
+  ANSWERED
+  SKIPPED
+}
+
+enum InterviewAnswerStatus {
+  EVALUATING
+  EVALUATED
+  FAILED
+}
+
+enum InterviewVerdict {
+  STRONG
+  PARTIAL
+  WEAK_EVIDENCE
+  INCORRECT
+}
+
+enum AssessmentSource {
+  JOB_MATCH
+  CAREER_GOAL
+  SKILL
+  MIXED
+}
+
+enum AssessmentType {
+  TECHNICAL
+  CONCEPTUAL
+  PRACTICAL
+  MIXED
+}
+
+/// ADAPTIVE: per-skill difficulty planned in code from CV / Job Match evidence (never Advanced from the CV alone).
+enum AssessmentDifficulty {
+  BEGINNER
+  INTERMEDIATE
+  ADVANCED
+  ADAPTIVE
+}
+
+enum AssessmentFocus {
+  CORE_CONCEPTS
+  PROBLEM_SOLVING
+  PRACTICAL_APPLICATION
+  TECHNICAL_KNOWLEDGE
+  REAL_WORLD_SCENARIOS
+  MIXED
+}
+
+/// DRAFT (queued) → GENERATING → IN_PROGRESS → COMPLETED | EXPIRED; DRAFT/GENERATING → FAILED.
+enum AssessmentStatus {
+  DRAFT
+  GENERATING
+  IN_PROGRESS
+  COMPLETED
+  EXPIRED
+  FAILED
+}
+
+/// Real pipeline checkpoints shown while an assessment is being generated.
+enum AssessmentStage {
+  PREPARING
+  GENERATING
+  VALIDATING
+  FINALIZING
+}
+
+/// Replaces the Phase 1 placeholder QuestionType. Code is evaluated as text, never executed.
+enum AssessmentQuestionType {
+  MULTIPLE_CHOICE
+  TRUE_FALSE
+  SHORT_ANSWER
+  SCENARIO
+  TECHNICAL
+}
+
+/// Why a question's skill was selected. Every question must be traceable to one.
+enum AssessmentQuestionSource {
+  CV_ANALYSIS
+  JOB_MATCH
+  CAREER_GOAL
+  ROADMAP
+  SKILL_SELECTION
+}
+
+enum AssessmentQuestionStatus {
+  PENDING
+  ANSWERED
+  SKIPPED
+}
+
+enum AssessmentAnswerStatus {
+  SUBMITTED
+  EVALUATED
+  FAILED
+}
+
+/// Deterministic thresholds live in lib/assessment/scoring.ts.
+enum AssessmentLevel {
+  NEEDS_IMPROVEMENT
+  DEVELOPING
+  COMPETENT
+  STRONG
+}
+
+enum ActivityType {
+  CV_UPLOADED
+  CV_ANALYZED
+  JOB_ANALYZED
+  ROADMAP_CREATED
+  ROADMAP_ITEM_COMPLETED
+  INTERVIEW_COMPLETED
+  ASSESSMENT_COMPLETED
+  PROJECT_ADDED
+}
+
+// ─── Auth (Auth.js Prisma adapter compatible) ────────────────────────────────
+
+model User {
+  id                String    @id @default(cuid())
+  /// Display name (Auth.js standard field).
+  name              String?
+  firstName         String?
+  lastName          String?
+  /// Always stored lower-cased.
+  email             String    @unique
+  emailVerified     DateTime?
+  image             String?
+  /// scrypt hash for email+password sign-in. Null for OAuth-only users. Never leaves the server.
+  passwordHash      String?
+  /// Sessions issued before this instant are rejected (set on password change/reset).
+  passwordChangedAt DateTime?
+  /// Public handle used for /passport/[username].
+  username          String?   @unique
+  role              Role      @default(USER)
+  createdAt         DateTime  @default(now())
+  updatedAt         DateTime  @updatedAt
+
+  accounts       Account[]
+  sessions       Session[]
+  profile        Profile?
+  cvs            CV[]
+  jobs           Job[]
+  skills         UserSkill[]
+  roadmaps       Roadmap[]
+  interviews     Interview[]
+  assessments    Assessment[]
+  projects       Project[]
+  passport       SkillPassport?
+  educations     Education[]
+  certifications Certification[]
+  achievements   Achievement[]
+  experiences    Experience[]
+  activities     Activity[]
+}
+
+model Account {
+  id                String   @id @default(cuid())
+  userId            String
+  type              String
+  provider          String
+  providerAccountId String
+  refresh_token     String?  @db.Text
+  access_token      String?  @db.Text
+  expires_at        Int?
+  token_type        String?
+  scope             String?
+  id_token          String?  @db.Text
+  session_state     String?
+  createdAt         DateTime @default(now())
+  updatedAt         DateTime @updatedAt
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([provider, providerAccountId])
+  @@index([userId])
+}
+
+model Session {
+  id           String   @id @default(cuid())
+  sessionToken String   @unique
+  userId       String
+  expires      DateTime
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+}
+
+/// Auth.js tokens. Also used for password reset (identifier "password-reset:<email>",
+/// token stored as a SHA-256 hash, never the raw value).
+model VerificationToken {
+  identifier String
+  token      String
+  expires    DateTime
+
+  @@unique([identifier, token])
+}
+
+/// Signed-out sessions. JWT sessions are stateless, so sign-out records the
+/// session's random id (`sid` claim) here until the token would have expired;
+/// requests carrying a revoked sid are rejected. Holds no user data.
+model RevokedSession {
+  sid       String   @id
+  expiresAt DateTime
+  createdAt DateTime @default(now())
+
+  @@index([expiresAt])
+}
+
+// ─── Profile ─────────────────────────────────────────────────────────────────
+
+model Profile {
+  id              String           @id @default(cuid())
+  userId          String           @unique
+  headline        String?
+  bio             String?          @db.Text
+  location        String?
+  careerGoal      CareerGoal?
+  experienceLevel ExperienceLevel?
+  yearsExperience Int?
+  websiteUrl      String?
+  githubUrl       String?
+  linkedinUrl     String?
+  createdAt       DateTime         @default(now())
+  updatedAt       DateTime         @updatedAt
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+}
+
+// ─── Skills ──────────────────────────────────────────────────────────────────
+
+model Skill {
+  id        String        @id @default(cuid())
+  name      String        @unique
+  slug      String        @unique
+  category  SkillCategory @default(OTHER)
+  createdAt DateTime      @default(now())
+  updatedAt DateTime      @updatedAt
+
+  userSkills   UserSkill[]
+  roadmapItems RoadmapItem[]
+  projects     Project[]
+}
+
+model UserSkill {
+  id          String      @id @default(cuid())
+  userId      String
+  skillId     String
+  level       SkillLevel  @default(BEGINNER)
+  /// 0–100 proficiency estimate.
+  proficiency Int         @default(0)
+  source      SkillSource @default(SELF_REPORTED)
+  verified    Boolean     @default(false)
+  /// Phase 8: shown on the public Skill Passport only when PUBLIC.
+  visibility  Visibility  @default(PRIVATE)
+  /// Optional user-approved summary (may be AI-assisted from real evidence).
+  summary     String?     @db.Text
+  position    Int         @default(0)
+  createdAt   DateTime    @default(now())
+  updatedAt   DateTime    @updatedAt
+
+  user  User  @relation(fields: [userId], references: [id], onDelete: Cascade)
+  skill Skill @relation(fields: [skillId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, skillId])
+  @@index([skillId])
+}
+
+// ─── CV ──────────────────────────────────────────────────────────────────────
+
+/// An uploaded CV. Its status is derived from its latest CvAnalysis (not stored twice).
+model CV {
+  id            String   @id @default(cuid())
+  userId        String
+  /// Original filename, for display only — never used as a storage path.
+  fileName      String
+  /// MIME type determined from the file's content (not the browser's claim).
+  mimeType      String
+  fileSize      Int
+  /// Opaque, server-generated key into the private file store. Never a public URL.
+  storageKey    String   @unique
+  /// Extracted plain text. Sensitive — server-side only, never sent to the browser.
+  extractedText String   @db.Text
+  /// True when the text exceeded the analysis limit and was cut.
+  textTruncated Boolean  @default(false)
+  pageCount     Int?
+  isPrimary     Boolean  @default(false)
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+
+  user        User          @relation(fields: [userId], references: [id], onDelete: Cascade)
+  analyses    CvAnalysis[]
+  jobAnalyses JobAnalysis[]
+  roadmaps    Roadmap[]
+  interviews  Interview[]
+  assessments Assessment[]
+
+  @@index([userId, createdAt])
+}
+
+/// One analysis run. Re-analysis creates a new row; history is never overwritten.
+model CvAnalysis {
+  id             String         @id @default(cuid())
+  cvId           String
+  status         AnalysisStatus @default(PENDING)
+  stage          AnalysisStage  @default(QUEUED)
+  /// 0–100, derived from dimension scores (lib/cv/scoring.ts). Null until completed.
+  score          Int?
+  /// Zod-validated report (lib/cv/analysis-schema.ts). Null until completed.
+  result         Json?
+  /// "mock" or a real provider name — mock results are labelled as such in the UI.
+  provider       String
+  model          String?
+  scoringVersion Int?
+  /// Internal failure code mapped to a user-facing message. Never raw error text.
+  errorCode      String?
+  startedAt      DateTime?
+  completedAt    DateTime?
+  createdAt      DateTime       @default(now())
+  updatedAt      DateTime       @updatedAt
+
+  cv          CV           @relation(fields: [cvId], references: [id], onDelete: Cascade)
+  roadmaps    Roadmap[]
+  interviews  Interview[]
+  assessments Assessment[]
+
+  @@index([cvId, createdAt])
+  @@index([status])
+}
+
+// ─── Jobs ────────────────────────────────────────────────────────────────────
+
+/// A job posting the user wants to match against (the "Job Match"). Private to its owner.
+model Job {
+  id          String   @id @default(cuid())
+  userId      String
+  title       String?
+  company     String?
+  location    String?
+  /// Optional http(s) link to the posting. Rendered as an external, nofollow link.
+  sourceUrl   String?
+  /// The pasted job description. Private user data; never logged.
+  description String   @db.Text
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  user        User          @relation(fields: [userId], references: [id], onDelete: Cascade)
+  analyses    JobAnalysis[]
+  roadmaps    Roadmap[]
+  interviews  Interview[]
+  assessments Assessment[]
+
+  @@index([userId, createdAt])
+}
+
+/// One CV-to-job comparison run. Re-analysis creates a new row; history is kept.
+model JobAnalysis {
+  id             String         @id @default(cuid())
+  jobId          String
+  /// CV compared against. Nullable so deleting a CV keeps earlier reports readable.
+  cvId           String?
+  status         AnalysisStatus @default(PENDING)
+  stage          AnalysisStage  @default(QUEUED)
+  /// 0–100 profile-to-job match from lib/job-match/scoring.ts. Not a hiring probability.
+  matchScore     Int?
+  /// Zod-validated report (lib/job-match/schema.ts). Null until completed.
+  result         Json?
+  /// "mock" or a real provider name — mock results are labelled in the UI.
+  provider       String
+  model          String?
+  scoringVersion Int?
+  /// Internal failure code mapped to a user-facing message. Never raw error text.
+  errorCode      String?
+  startedAt      DateTime?
+  completedAt    DateTime?
+  createdAt      DateTime       @default(now())
+  updatedAt      DateTime       @updatedAt
+
+  job         Job          @relation(fields: [jobId], references: [id], onDelete: Cascade)
+  cv          CV?          @relation(fields: [cvId], references: [id], onDelete: SetNull)
+  roadmaps    Roadmap[]
+  interviews  Interview[]
+  assessments Assessment[]
+
+  @@index([jobId, createdAt])
+  @@index([cvId])
+  @@index([status])
+}
+
+// ─── Roadmap ─────────────────────────────────────────────────────────────────
+
+/// A generated career roadmap. Sources are referenced, never copied: the CV text
+/// and job description stay on their own records. Re-generation creates a new row.
+model Roadmap {
+  id                String         @id @default(cuid())
+  userId            String
+  sourceType        RoadmapSource
+  title             String
+  /// Target role, e.g. "AI Engineer".
+  goal              String
+  cvId              String?
+  /// The CV analysis the roadmap was built from.
+  cvAnalysisId      String?
+  /// Job Match roadmaps only.
+  jobId             String?
+  jobAnalysisId     String?
+  /// Career-goal roadmaps only (from the profile at creation time).
+  careerGoal        CareerGoal?
+  timeframeWeeks    Int?
+  regeneratedFromId String?
+  status            AnalysisStatus @default(PENDING)
+  stage             AnalysisStage  @default(QUEUED)
+  /// "mock" or a real provider name — mock results are labelled in the UI.
+  provider          String
+  model             String?
+  roadmapVersion    Int?
+  /// Zod-validated report (lib/roadmap/schema.ts) without tasks; tasks are RoadmapItem rows.
+  result            Json?
+  /// Internal failure code mapped to a user-facing message. Never raw error text.
+  errorCode         String?
+  startedAt         DateTime?
+  completedAt       DateTime?
+  createdAt         DateTime       @default(now())
+  updatedAt         DateTime       @updatedAt
+
+  user            User          @relation(fields: [userId], references: [id], onDelete: Cascade)
+  cv              CV?           @relation(fields: [cvId], references: [id], onDelete: SetNull)
+  cvAnalysis      CvAnalysis?   @relation(fields: [cvAnalysisId], references: [id], onDelete: SetNull)
+  job             Job?          @relation(fields: [jobId], references: [id], onDelete: SetNull)
+  jobAnalysis     JobAnalysis?  @relation(fields: [jobAnalysisId], references: [id], onDelete: SetNull)
+  regeneratedFrom Roadmap?      @relation("RoadmapRegeneration", fields: [regeneratedFromId], references: [id], onDelete: SetNull)
+  regenerations   Roadmap[]     @relation("RoadmapRegeneration")
+  items           RoadmapItem[]
+  interviews      Interview[]
+  assessments     Assessment[]
+
+  @@index([userId, createdAt])
+  @@index([status])
+}
+
+/// One roadmap task. Progress lives here, so status changes never need the AI.
+model RoadmapItem {
+  id                 String              @id @default(cuid())
+  roadmapId          String
+  /// Global order across the roadmap.
+  position           Int
+  phaseOrder         Int
+  /// Stable task key within the roadmap (e.g. "t3"), used by dependsOn.
+  key                String
+  title              String
+  description        String              @db.Text
+  skill              String
+  category           RoadmapTaskCategory
+  /// Computed by lib/roadmap/prioritization.ts, not taken from the AI.
+  priority           RoadmapPriority
+  estimatedHours     Int
+  estimatedDays      Int
+  /// Human-readable prerequisites (task titles or outside knowledge).
+  prerequisites      String[]
+  /// Keys of tasks in this roadmap that must be completed first.
+  dependsOn          String[]
+  practicalOutcome   String              @db.Text
+  verificationMethod String              @db.Text
+  status             RoadmapItemStatus   @default(AVAILABLE)
+  startedAt          DateTime?
+  completedAt        DateTime?
+  createdAt          DateTime            @default(now())
+  updatedAt          DateTime            @updatedAt
+
+  roadmap Roadmap @relation(fields: [roadmapId], references: [id], onDelete: Cascade)
+  skills  Skill[]
+
+  @@unique([roadmapId, position])
+  @@unique([roadmapId, key])
+}
+
+// ─── Interview ───────────────────────────────────────────────────────────────
+
+/// A practice interview built from the user's own sources. Sources are referenced, never copied.
+model Interview {
+  id               String              @id @default(cuid())
+  userId           String
+  sourceType       InterviewSource
+  /// Target role, e.g. "Machine Learning Engineer" (job title or career-goal label).
+  target           String
+  /// Career-goal interviews only (from the profile at creation time).
+  careerGoal       CareerGoal?
+  cvId             String?
+  cvAnalysisId     String?
+  /// Job Match interviews only.
+  jobId            String?
+  jobAnalysisId    String?
+  /// Optional completed roadmap whose skill gaps informed the questions.
+  roadmapId        String?
+  /// Set when created with "Practice again"; the earlier interview is kept.
+  practiceOfId     String?
+  type             InterviewType
+  difficulty       InterviewDifficulty
+  focus            InterviewFocus
+  /// Number of primary questions (follow-ups are extra).
+  questionCount    Int
+  status           InterviewStatus     @default(DRAFT)
+  stage            InterviewStage      @default(PREPARING)
+  /// "mock" or a real provider name — mock results are labelled in the UI.
+  provider         String
+  model            String?
+  interviewVersion Int?
+  introduction     String?             @db.Text
+  /// Zod-validated final report (lib/interview/schema.ts), computed in code.
+  result           Json?
+  /// 0–100, computed in code from answer evaluations once completed.
+  overallScore     Int?
+  /// Internal failure code mapped to a user-facing message. Never raw error text.
+  errorCode        String?
+  startedAt        DateTime?
+  completedAt      DateTime?
+  createdAt        DateTime            @default(now())
+  updatedAt        DateTime            @updatedAt
+
+  user        User                @relation(fields: [userId], references: [id], onDelete: Cascade)
+  cv          CV?                 @relation(fields: [cvId], references: [id], onDelete: SetNull)
+  cvAnalysis  CvAnalysis?         @relation(fields: [cvAnalysisId], references: [id], onDelete: SetNull)
+  job         Job?                @relation(fields: [jobId], references: [id], onDelete: SetNull)
+  jobAnalysis JobAnalysis?        @relation(fields: [jobAnalysisId], references: [id], onDelete: SetNull)
+  roadmap     Roadmap?            @relation(fields: [roadmapId], references: [id], onDelete: SetNull)
+  practiceOf  Interview?          @relation("InterviewPractice", fields: [practiceOfId], references: [id], onDelete: SetNull)
+  practices   Interview[]         @relation("InterviewPractice")
+  questions   InterviewQuestion[]
+
+  @@index([userId, createdAt])
+  @@index([status])
+}
+
+/// A primary question (followUpIndex 0) or one of at most two follow-ups to it.
+model InterviewQuestion {
+  id               String                  @id @default(cuid())
+  interviewId      String
+  /// Primary question number, 1..questionCount. Follow-ups share their parent's position.
+  position         Int
+  followUpIndex    Int                     @default(0)
+  parentQuestionId String?
+  kind             InterviewQuestionKind
+  prompt           String                  @db.Text
+  skill            String?
+  source           InterviewQuestionSource
+  /// Why this question was selected, e.g. "The position requires Python development."
+  sourceReason     String
+  /// Verbatim quote from the CV or job description that grounds the question, when there is one.
+  sourceEvidence   String?
+  status           InterviewQuestionStatus @default(PENDING)
+  answeredAt       DateTime?
+  createdAt        DateTime                @default(now())
+  updatedAt        DateTime                @updatedAt
+
+  interview Interview           @relation(fields: [interviewId], references: [id], onDelete: Cascade)
+  parent    InterviewQuestion?  @relation("InterviewFollowUp", fields: [parentQuestionId], references: [id], onDelete: Cascade)
+  followUps InterviewQuestion[] @relation("InterviewFollowUp")
+  answer    InterviewAnswer?
+
+  @@unique([interviewId, position, followUpIndex])
+}
+
+/// The user's answer (private content) and its evaluation. The score is computed in code.
+model InterviewAnswer {
+  id                String                @id @default(cuid())
+  questionId        String                @unique
+  content           String                @db.Text
+  status            InterviewAnswerStatus @default(EVALUATING)
+  verdict           InterviewVerdict?
+  /// 0–10 ratings from the evaluator; technicalAccuracy is null for non-technical questions.
+  technicalAccuracy Int?
+  relevance         Int?
+  completeness      Int?
+  clarity           Int?
+  communication     Int?
+  evidence          Int?
+  /// 0–100, computed in code (lib/interview/scoring.ts).
+  score             Int?
+  feedback          String?               @db.Text
+  accuracyNote      String?               @db.Text
+  strengths         String[]
+  missingPoints     String[]
+  improvement       String?               @db.Text
+  errorCode         String?
+  evaluatedAt       DateTime?
+  createdAt         DateTime              @default(now())
+  updatedAt         DateTime              @updatedAt
+
+  question InterviewQuestion @relation(fields: [questionId], references: [id], onDelete: Cascade)
+}
+
+// ─── Assessments ─────────────────────────────────────────────────────────────
+
+/// A per-user assessment generated from the user's own sources. Sources are referenced, never copied.
+model Assessment {
+  id                String               @id @default(cuid())
+  userId            String
+  sourceType        AssessmentSource
+  title             String
+  /// Supported skills under test (lib/assessment/skills.ts), in display order.
+  skills            String[]
+  /// Career-goal assessments only (from the profile at creation time).
+  careerGoal        CareerGoal?
+  cvId              String?
+  cvAnalysisId      String?
+  /// Job Match assessments only.
+  jobId             String?
+  jobAnalysisId     String?
+  /// Optional completed roadmap that informed skill selection and recommendations.
+  roadmapId         String?
+  /// Set when created with "Practice again"; the earlier assessment is kept.
+  practiceOfId      String?
+  type              AssessmentType
+  difficulty        AssessmentDifficulty
+  focus             AssessmentFocus
+  questionCount     Int
+  /// null = no time limit.
+  timeLimitMinutes  Int?
+  status            AssessmentStatus     @default(DRAFT)
+  stage             AssessmentStage      @default(PREPARING)
+  /// "mock" or a real provider name — mock output is labelled in the UI.
+  provider          String
+  model             String?
+  assessmentVersion Int?
+  /// Internal failure code mapped to a user-facing message. Never raw error text.
+  errorCode         String?
+  /// Set when the user starts answering; the timer runs from here.
+  startedAt         DateTime?
+  expiresAt         DateTime?
+  completedAt       DateTime?
+  createdAt         DateTime             @default(now())
+  updatedAt         DateTime             @updatedAt
+
+  user        User                 @relation(fields: [userId], references: [id], onDelete: Cascade)
+  cv          CV?                  @relation(fields: [cvId], references: [id], onDelete: SetNull)
+  cvAnalysis  CvAnalysis?          @relation(fields: [cvAnalysisId], references: [id], onDelete: SetNull)
+  job         Job?                 @relation(fields: [jobId], references: [id], onDelete: SetNull)
+  jobAnalysis JobAnalysis?         @relation(fields: [jobAnalysisId], references: [id], onDelete: SetNull)
+  roadmap     Roadmap?             @relation(fields: [roadmapId], references: [id], onDelete: SetNull)
+  practiceOf  Assessment?          @relation("AssessmentPractice", fields: [practiceOfId], references: [id], onDelete: SetNull)
+  practices   Assessment[]         @relation("AssessmentPractice")
+  questions   AssessmentQuestion[]
+  result      AssessmentResult?
+
+  @@index([userId, createdAt])
+  @@index([status])
+}
+
+model AssessmentQuestion {
+  id             String                   @id @default(cuid())
+  assessmentId   String
+  position       Int
+  type           AssessmentQuestionType
+  skill          String
+  difficulty     SkillLevel               @default(BEGINNER)
+  /// Scenario questions: the situation the question refers to.
+  scenario       String?                  @db.Text
+  prompt         String                   @db.Text
+  /// MULTIPLE_CHOICE: [{ id, label }]. Null otherwise.
+  options        Json?
+  /// Server-only grading data — never sent to the browser before results.
+  /// MULTIPLE_CHOICE: the correct option id. TRUE_FALSE: "true" | "false". Null for open questions.
+  correctAnswer  String?
+  /// Open questions: the points a complete answer covers. Server-only until results.
+  expectedPoints String[]
+  explanation    String                   @db.Text
+  source         AssessmentQuestionSource
+  sourceReason   String
+  status         AssessmentQuestionStatus @default(PENDING)
+  createdAt      DateTime                 @default(now())
+  updatedAt      DateTime                 @updatedAt
+
+  assessment Assessment        @relation(fields: [assessmentId], references: [id], onDelete: Cascade)
+  answer     AssessmentAnswer?
+
+  @@unique([assessmentId, position])
+}
+
+/// One locked answer per question (private user content). Scores are computed in code.
+model AssessmentAnswer {
+  id             String                 @id @default(cuid())
+  questionId     String                 @unique
+  /// MULTIPLE_CHOICE: option id. TRUE_FALSE: "true" | "false". Otherwise the user's text.
+  response       String                 @db.Text
+  status         AssessmentAnswerStatus @default(SUBMITTED)
+  isCorrect      Boolean?
+  /// 0–1 points for this question, computed in code (lib/assessment/scoring.ts).
+  score          Float?
+  /// 0–10 evaluator ratings for open questions.
+  accuracy       Int?
+  relevance      Int?
+  completeness   Int?
+  clarity        Int?
+  technicalDepth Int?
+  feedback       String?                @db.Text
+  errorCode      String?
+  submittedAt    DateTime               @default(now())
+  evaluatedAt    DateTime?
+
+  question AssessmentQuestion @relation(fields: [questionId], references: [id], onDelete: Cascade)
+}
+
+/// Final scores (computed in code) and grounded insights. One per assessment.
+model AssessmentResult {
+  id                String          @id @default(cuid())
+  assessmentId      String          @unique
+  rawScore          Float
+  maxScore          Int
+  /// 0–100.
+  percentage        Int
+  level             AssessmentLevel
+  /// [{ skill, score, max, percentage, level, questions }]
+  skillBreakdown    Json
+  /// [{ category, label, score, max, percentage, questions }]
+  categoryBreakdown Json
+  strengths         Json
+  improvementAreas  Json
+  recommendations   Json
+  reviewTopics      Json
+  /// "ai" when insights came from the result analysis, "rules" when the deterministic fallback was used.
+  insightsSource    String
+  /// True when the time limit ended the assessment.
+  timeExpired       Boolean         @default(false)
+  createdAt         DateTime        @default(now())
+
+  assessment Assessment @relation(fields: [assessmentId], references: [id], onDelete: Cascade)
+}
+
+// ─── Portfolio ───────────────────────────────────────────────────────────────
+
+/// A user's own project. User-provided content; private until made public.
+model Project {
+  id               String        @id @default(cuid())
+  userId           String
+  title            String
+  /// URL-safe and unique per user; used in public URLs instead of the id.
+  slug             String
+  shortDescription String
+  description      String?       @db.Text
+  /// Free-form tech stack labels, e.g. "Next.js", "PostgreSQL".
+  technologies     String[]
+  repositoryUrl    String?       @map("githubUrl")
+  liveUrl          String?
+  imageUrl         String?
+  role             String?
+  startDate        DateTime?
+  endDate          DateTime?
+  status           ProjectStatus @default(COMPLETED)
+  featured         Boolean       @default(false)
+  visibility       Visibility    @default(PRIVATE)
+  position         Int           @default(0)
+  createdAt        DateTime      @default(now())
+  updatedAt        DateTime      @updatedAt
+
+  user     User              @relation(fields: [userId], references: [id], onDelete: Cascade)
+  /// Linked from the user's own skills (UserSkill → Skill).
+  skills   Skill[]
+  evidence ProjectEvidence[]
+
+  @@unique([userId, slug])
+  @@index([userId])
+}
+
+/// A link supporting a project (repository, demo, document…). Always labelled user-provided.
+model ProjectEvidence {
+  id        String              @id @default(cuid())
+  projectId String
+  kind      ProjectEvidenceKind
+  label     String?
+  url       String
+  createdAt DateTime            @default(now())
+
+  project Project @relation(fields: [projectId], references: [id], onDelete: Cascade)
+
+  @@index([projectId])
+}
+
+model Education {
+  id          String     @id @default(cuid())
+  userId      String
+  institution String
+  degree      String?
+  field       String?
+  startDate   DateTime?
+  endDate     DateTime?
+  grade       String?
+  description String?    @db.Text
+  visibility  Visibility @default(PRIVATE)
+  position    Int        @default(0)
+  createdAt   DateTime   @default(now())
+  updatedAt   DateTime   @updatedAt
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+}
+
+/// User-entered certification. A credential URL is stored as user-provided evidence, never auto-verified.
+model Certification {
+  id             String     @id @default(cuid())
+  userId         String
+  name           String
+  issuer         String
+  issueDate      DateTime?
+  expirationDate DateTime?
+  credentialId   String?
+  credentialUrl  String?
+  description    String?    @db.Text
+  /// Skill names this certification supports (matched to the user's skills by name).
+  skills         String[]
+  visibility     Visibility @default(PRIVATE)
+  createdAt      DateTime   @default(now())
+  updatedAt      DateTime   @updatedAt
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+}
+
+model Achievement {
+  id          String          @id @default(cuid())
+  userId      String
+  title       String
+  kind        AchievementKind @default(OTHER)
+  description String?         @db.Text
+  issuer      String?
+  date        DateTime?
+  url         String?
+  visibility  Visibility      @default(PRIVATE)
+  createdAt   DateTime        @default(now())
+  updatedAt   DateTime        @updatedAt
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+}
+
+/// User-entered work experience. Never inferred from the CV.
+model Experience {
+  id             String          @id @default(cuid())
+  userId         String
+  company        String
+  title          String
+  description    String?         @db.Text
+  startDate      DateTime?
+  /// Null means current.
+  endDate        DateTime?
+  location       String?
+  employmentType EmploymentType?
+  visibility     Visibility      @default(PRIVATE)
+  createdAt      DateTime        @default(now())
+  updatedAt      DateTime        @updatedAt
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+}
+
+// ─── Skill Passport ──────────────────────────────────────────────────────────
+
+/// Public portfolio settings. The public URL is /p/[User.username]; off by default.
+model SkillPassport {
+  id                 String   @id @default(cuid())
+  userId             String   @unique
+  isPublic           Boolean  @default(false)
+  showAbout          Boolean  @default(true)
+  showProjects       Boolean  @default(true)
+  showSkills         Boolean  @default(true)
+  showEducation      Boolean  @default(true)
+  showCertifications Boolean  @default(true)
+  showAchievements   Boolean  @default(true)
+  showExperience     Boolean  @default(true)
+  showLinks          Boolean  @default(true)
+  /// Latest assessment percentage per public skill.
+  showAssessments    Boolean  @default(true)
+  showInterviewScore Boolean  @default(false)
+  /// Kept from Phase 1; roadmap details are never published.
+  showRoadmap        Boolean  @default(true)
+  createdAt          DateTime @default(now())
+  updatedAt          DateTime @updatedAt
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+}
+
+// ─── Activity feed ───────────────────────────────────────────────────────────
+
+model Activity {
+  id        String       @id @default(cuid())
+  userId    String
+  type      ActivityType
+  title     String
+  /// Non-sensitive references only (ids, scores). Never CV text.
+  metadata  Json?
+  createdAt DateTime     @default(now())
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId, createdAt])
+}

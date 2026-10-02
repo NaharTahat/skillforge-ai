@@ -1,0 +1,23 @@
+{
+  "$comment": "Known advisories accepted after review. Every entry needs a reason and a reviewBy date; the audit check fails when an entry expires or a new high/critical advisory appears. Re-check whether a fixed Prisma 7.x exists before extending a date.",
+  "advisories": [
+    {
+      "id": "GHSA-ggr8-5vv4-36mx",
+      "package": "deepmerge-ts",
+      "reason": "Pulled in only by the Prisma CLI's config loader (@prisma/config), which merges our own prisma.config.ts object. No user input reaches it. The only npm fix is a major downgrade to Prisma 6, which breaks the Prisma 7 adapter setup.",
+      "reviewBy": "2026-12-31"
+    },
+    {
+      "id": "GHSA-3f6p-5ww8-9rcr",
+      "package": "mysql2",
+      "reason": "MySQL driver bundled with the Prisma CLI. This app only uses PostgreSQL through @prisma/adapter-pg; mysql2 is never loaded or connected.",
+      "reviewBy": "2026-12-31"
+    },
+    {
+      "id": "GHSA-rgwj-5xj2-c3m3",
+      "package": "mysql2",
+      "reason": "Same MySQL driver as above (compressed MySQL protocol). Never loaded; no MySQL connections exist.",
+      "reviewBy": "2026-12-31"
+    }
+  ]
+}
